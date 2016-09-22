@@ -40,7 +40,7 @@ struct TypeManager
     {
         if (isDefined(t.name))
             return false;
-        auto i = types.insert({ t.name, t });
+        types.insert({ t.name, t });
         return true;
     }
 
@@ -89,9 +89,9 @@ struct TypeManager
     bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int offset = -1, int arrsize = 0)
     {
         auto found = structs.find(parent);
-        if (arrsize < 0 || found == structs.end())
+        if (arrsize < 0 || found == structs.end() || !isDefined(type))
             return false;
-        const auto & s = found->second;
+        auto & s = found->second;
 
         for (const auto & member : s.members)
             if (member.name == name)
@@ -110,7 +110,8 @@ struct TypeManager
         else
             m.offset = offset;
 
-        return AddMember(parent, m);
+        s.members.push_back(m);
+        return true;
     }
 
     bool AddMember(const std::string & parent, const Member & member)
@@ -144,17 +145,17 @@ private:
                 primitives.insert({ a, { p } });
             primitivesizes[p] = bitsize;
         };
-        p("int8_t,int8,char,CHAR,INT8,byte,bool,signed char", Int8, 8);
-        p("uint8_t,uint8,uchar,unsigned char,UCHAR,UINT8,ubyte,BYTE", Uint8, 8);
-        p("int16_t,int16,wchar_t,char16_t,short,SHORT", Int16, 16);
-        p("uint16_t,uint16,ushort,USHORT,unsigned short,WORD", Int16, 16);
-        p("int32_t,int32,int,long,LONG,INT,INT32", Int32, 32);
-        p("uint32_t,uint32,unsigned int,unsigned long,DWORD", Uint32, 32);
+        p("int8_t,int8,char,byte,bool,signed char", Int8, 8);
+        p("uint8_t,uint8,uchar,unsigned char,ubyte", Uint8, 8);
+        p("int16_t,int16,wchar_t,char16_t,short", Int16, 16);
+        p("uint16_t,uint16,ushort,unsigned short", Int16, 16);
+        p("int32_t,int32,int,long", Int32, 32);
+        p("uint32_t,uint32,unsigned int,unsigned long", Uint32, 32);
         p("int64_t,int64,long long", Int64, 64);
-        p("uint64_t,uint64,unsigned long long,QWORD", Uint64, 64);
+        p("uint64_t,uint64,unsigned long long", Uint64, 64);
         p("dsint", Dsint, sizeof(void*) * 8);
-        p("duint", Duint, sizeof(void*) * 8);
-        p("pointer,PVOID", Pointer, sizeof(void*) * 8);
+        p("duint,size_t", Duint, sizeof(void*) * 8);
+        p("ptr,void*", Pointer, sizeof(void*) * 8);
     }
 
     template<typename K, typename V>
@@ -193,7 +194,7 @@ private:
         {
             for (const auto & member : s.members)
             {
-                auto membersize = getSizeof(member.type, depth + 1) * member.arrsize ? member.arrsize : 1;
+                auto membersize = getSizeof(member.type, depth + 1) * (member.arrsize ? member.arrsize : 1);
                 if (!membersize)
                     return 0;
                 if (membersize > size)
@@ -203,7 +204,7 @@ private:
         else
         {
             const auto & last = s.members[s.members.size() - 1];
-            auto lastsize = getSizeof(last.type, depth + 1) * last.arrsize ? last.arrsize : 1;
+            auto lastsize = getSizeof(last.type, depth + 1) * (last.arrsize ? last.arrsize : 1);
             if (!lastsize)
                 return 0;
             size = last.offset + lastsize;
@@ -231,6 +232,13 @@ int main()
     t.AppendMember("b", "short", 2);
     t.AppendMember("c", "int", 4);
     printf("t.Sizeof(ST) = %d\n", t.Sizeof("ST"));
+
+    t.AddType("DWORD", "unsigned int");
+
+    t.AddStruct("_FILETIME", 1);
+    t.AppendMember("dwLoDateTime", "DWORD");
+    t.AppendMember("dwHighDateTime", "DWORD");
+    printf("t.Sizeof(_FILETIME) = %d\n", t.Sizeof("_FILETIME"));
 
     system("pause");
     return 0;
