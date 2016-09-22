@@ -10,7 +10,7 @@ int main()
         char d;
         int y;
     };
-    printf("sizeof(ST) = %d\n", sizeof(ST));
+    printf("sizeof(ST) = %d\n", int(sizeof(ST)));
 
     TypeManager t;
 
