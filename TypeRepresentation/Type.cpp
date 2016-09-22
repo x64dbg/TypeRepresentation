@@ -28,6 +28,22 @@ int main()
     t.AppendMember("dwHighDateTime", "DWORD");
     printf("t.Sizeof(_FILETIME) = %d\n", t.Sizeof("_FILETIME"));
 
+    union UT
+    {
+        char a;
+        short b;
+        int c;
+        long long d;
+    };
+    printf("sizeof(UT) = %d\n", int(sizeof(UT)));
+
+    t.AddUnion("UT");
+    t.AppendMember("a", "char");
+    t.AppendMember("b", "short");
+    t.AppendMember("c", "int");
+    t.AppendMember("d", "long long");
+    printf("t.Sizeof(UT) = %d\n", t.Sizeof("UT"));
+
     getchar();
     return 0;
 }
