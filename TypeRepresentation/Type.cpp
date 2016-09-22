@@ -10,12 +10,12 @@ struct TypeManager
         setupPrimitives();
     }
 
-    bool AddType(const Type & t)
+    bool AddType(const std::string & name, const std::string & primitive)
     {
-        if (isDefined(t.name))
+        auto found = primitives.find(primitive);
+        if (found == primitives.end())
             return false;
-        auto i = types.insert({ t.name, t });
-        return true;
+        return AddType(name, found->second);
     }
 
     bool AddType(const std::string & name, Primitive primitive, int bitsize = 0, const std::string & pointto = "")
@@ -36,19 +36,11 @@ struct TypeManager
         return AddType(t);
     }
 
-    bool AddType(const std::string & name, const std::string & primitive)
+    bool AddType(const Type & t)
     {
-        auto found = primitives.find(primitive);
-        if (found == primitives.end())
+        if (isDefined(t.name))
             return false;
-        return AddType(name, found->second);
-    }
-
-    bool AddStruct(const StructUnion & s)
-    {
-        if (isDefined(s.name))
-            return false;
-        structs.insert({ s.name, s });
+        auto i = types.insert({ t.name, t });
         return true;
     }
 
@@ -61,11 +53,12 @@ struct TypeManager
         return AddStruct(s);
     }
 
-    bool AddUnion(const StructUnion & u)
+    bool AddStruct(const StructUnion & s)
     {
-        if (isDefined(u.name))
+        laststruct = s.name;
+        if (isDefined(s.name))
             return false;
-        structs.insert({ u.name, u });
+        structs.insert({ s.name, s });
         return true;
     }
 
@@ -79,16 +72,21 @@ struct TypeManager
         return AddUnion(u);
     }
 
-    bool AddMember(const std::string & parent, const Member & member)
+    bool AddUnion(const StructUnion & u)
     {
-        auto found = structs.find(parent);
-        if (found == structs.end())
+        laststruct = u.name;
+        if (isDefined(u.name))
             return false;
-        found->second.members.push_back(member);
+        structs.insert({ u.name, u });
         return true;
     }
 
-    bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
+    bool AppendMember(const std::string & name, const std::string & type, int offset = -1, int arrsize = 0)
+    {
+        return AddMember(laststruct, name, type, offset, arrsize);
+    }
+
+    bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int offset = -1, int arrsize = 0)
     {
         auto found = structs.find(parent);
         if (arrsize < 0 || found == structs.end())
@@ -115,6 +113,15 @@ struct TypeManager
         return AddMember(parent, m);
     }
 
+    bool AddMember(const std::string & parent, const Member & member)
+    {
+        auto found = structs.find(parent);
+        if (found == structs.end())
+            return false;
+        found->second.members.push_back(member);
+        return true;
+    }
+
 #define MAX_DEPTH 100
 
     int Sizeof(const std::string & type)
@@ -126,6 +133,7 @@ private:
     std::unordered_map<Primitive, int> primitivesizes;
     std::unordered_map<std::string, Type> types;
     std::unordered_map<std::string, StructUnion> structs;
+    std::string laststruct;
 
     void setupPrimitives()
     {
@@ -207,25 +215,21 @@ private:
     }
 };
 
-#ifdef _WIN64
-#pragma pack(push, 16)
-#else //x86
-#pragma pack(push, 8)
-#endif //_WIN64
-
 int main()
 {
     struct ST
     {
-        int x;
-        char y;
+        short a;
+        short b;
+        int y;
     };
     printf("sizeof(ST) = %d\n", sizeof(ST));
 
     TypeManager t;
     t.AddStruct("ST");
-    t.AddMember("ST", "x", "int");
-    t.AddMember("ST", "y", "char");
+    t.AppendMember("a", "short", 0);
+    t.AppendMember("b", "short", 2);
+    t.AppendMember("c", "int", 4);
     printf("t.Sizeof(ST) = %d\n", t.Sizeof("ST"));
 
     system("pause");
