@@ -6,8 +6,8 @@ int main()
 
     struct ST
     {
-        short a;
-        short b;
+        char a[3];
+        char d;
         int y;
     };
     printf("sizeof(ST) = %d\n", sizeof(ST));
@@ -15,15 +15,15 @@ int main()
     TypeManager t;
 
     t.AddStruct("ST");
-    t.AppendMember("a", "short", 0);
-    t.AppendMember("b", "short", 2);
-    t.AppendMember("c", "int", 4);
+    t.AppendMember("a", "char", -1, 3);
+    t.AppendMember("d", "char");
+    t.AppendMember("y", "int");
     printf("t.Sizeof(ST) = %d\n", t.Sizeof("ST"));
 
     t.AddType("DWORD", "unsigned int");
     printf("t.Sizeof(DWORD) = %d\n", t.Sizeof("DWORD"));
 
-    t.AddStruct("_FILETIME", 1);
+    t.AddStruct("_FILETIME");
     t.AppendMember("dwLoDateTime", "DWORD");
     t.AppendMember("dwHighDateTime", "DWORD");
     printf("t.Sizeof(_FILETIME) = %d\n", t.Sizeof("_FILETIME"));

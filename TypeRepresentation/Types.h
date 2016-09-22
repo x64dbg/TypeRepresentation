@@ -27,7 +27,7 @@ namespace Types
     {
         std::string name; //Type identifier.
         Primitive primitive; //Primitive type.
-        int bitsize; //Size in bits.
+        int bitsize = 0; //Size in bits.
         std::string pointto; //Type identifier of *Type
     };
 
@@ -35,8 +35,8 @@ namespace Types
     {
         std::string name; //Member identifier
         std::string type; //Type.name
-        int offset; //Member offset in Struct (ignored for unions)
-        int arrsize; //Number of elements if Member is an array
+        int offset = 0; //Member offset in Struct (ignored for unions)
+        int arrsize = 0; //Number of elements if Member is an array
     };
 
     struct StructUnion
@@ -147,9 +147,13 @@ namespace Types
             m.type = type;
             if (offset < 0)
             {
-                m.offset = Sizeof(parent);
+                int alignment;
+                m.offset = getSizeof(parent, &alignment, 0);
                 if (s.members.size() && !m.offset)
                     return false;
+                auto typesize = Sizeof(type);
+                if (alignment && typesize <= alignment)
+                    m.offset -= alignment;
             }
             else
                 m.offset = offset;
@@ -169,7 +173,7 @@ namespace Types
 
         int Sizeof(const std::string & type)
         {
-            return getSizeof(type, 0);
+            return getSizeof(type, nullptr, 0);
         }
 
     private:
@@ -225,10 +229,12 @@ namespace Types
             return mapContains(primitives, id) || mapContains(types, id) || mapContains(structs, id);
         }
 
-        int getSizeof(const std::string & type, int depth)
+        int getSizeof(const std::string & type, int* alignment, int depth)
         {
             if (depth >= 100)
                 return 0;
+            if (alignment)
+                *alignment = 0;
             auto foundP = primitives.find(type);
             if (foundP != primitives.end())
                 return primitivesizes[foundP->second] / 8;
@@ -250,7 +256,7 @@ namespace Types
             {
                 for (const auto & member : s.members)
                 {
-                    auto membersize = getSizeof(member.type, depth + 1) * (member.arrsize ? member.arrsize : 1);
+                    auto membersize = getSizeof(member.type, nullptr, depth + 1) * (member.arrsize ? member.arrsize : 1);
                     if (!membersize)
                         return 0;
                     if (membersize > size)
@@ -260,13 +266,17 @@ namespace Types
             else
             {
                 const auto & last = s.members[s.members.size() - 1];
-                auto lastsize = getSizeof(last.type, depth + 1) * (last.arrsize ? last.arrsize : 1);
+                auto lastsize = getSizeof(last.type, nullptr, depth + 1) * (last.arrsize ? last.arrsize : 1);
                 if (!lastsize)
                     return 0;
                 size = last.offset + lastsize;
-                auto mod = size % s.alignment;
-                if (mod)
-                    size += s.alignment - mod;
+            }
+            auto mod = size % s.alignment;
+            if (mod)
+            {
+                if (alignment)
+                    *alignment = s.alignment - mod;
+                size += s.alignment - mod;
             }
             return size;
         }
