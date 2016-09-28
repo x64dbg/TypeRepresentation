@@ -15,8 +15,12 @@ struct PrintVisitor : TypeManager::Visitor
         else
             value = 0xCC;
         indent();
-        printf("%s %s = 0x%llX;\n", type.name.c_str(), member.name.c_str(), value);
-        mOffset += type.bitsize / 8;
+        if (parent().type == Parent::Array)
+            printf("%s %s[%d] = 0x%llX;\n", type.name.c_str(), member.name.c_str(), parent().index++, value);
+        else
+            printf("%s %s = 0x%llX;\n", type.name.c_str(), member.name.c_str(), value);
+        if (parent().type != Parent::Union)
+            mOffset += type.bitsize / 8;
         return true;
     }
 
@@ -24,7 +28,7 @@ struct PrintVisitor : TypeManager::Visitor
     {
         indent();
         printf("%s %s {\n", type.isunion ? "union" : "struct", type.name.c_str());
-        mDepth++;
+        mParentData.push_back(Parent(type.isunion ? Parent::Union : Parent::Struct));
         return true;
     }
 
@@ -32,27 +36,49 @@ struct PrintVisitor : TypeManager::Visitor
     {
         indent();
         printf("%s[%d] {\n", member.type.c_str(), member.arrsize);
-        mDepth++;
+        mParentData.push_back(Parent(Parent::Array));
         return true;
     }
 
     bool visitBack(const Member & member) override
     {
-        mDepth--;
+        mParentData.pop_back();
         indent();
         printf("} %s;\n", member.name.c_str());
         return true;
     }
 
 private:
-    int mDepth = 0;
+    struct Parent
+    {
+        enum Type
+        {
+            Struct,
+            Union,
+            Array
+        };
+        
+        Type type;
+        int index;
+
+        explicit Parent(Type type)
+            : type(type), index(0) { }
+    };
+
+    Parent & parent()
+    {
+        return mParentData[mParentData.size() - 1];
+    }
+
+    std::vector<Parent> mParentData;
+
     int mOffset = 0;
     void* mData = nullptr;
 
     void indent() const
     {
         printf("%02d: ", mOffset);
-        for (auto i = 0; i < mDepth * 2; i++)
+        for (auto i = 0; i < int(mParentData.size()) * 2; i++)
             printf(" ");
     }
 };
