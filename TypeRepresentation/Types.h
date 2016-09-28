@@ -54,12 +54,12 @@ namespace Types
             setupPrimitives();
         }
 
-        bool AddType(const std::string & name, const std::string & primitive)
+        bool AddType(const std::string & name, const std::string & type)
         {
-            auto found = primitives.find(primitive);
-            if (found == primitives.end())
+            auto found = types.find(type);
+            if (found == types.end())
                 return false;
-            return AddType(name, found->second);
+            return AddType(name, found->second.primitive);
         }
 
         bool AddType(const std::string & name, Primitive primitive, int bitsize = 0, const std::string & pointto = "")
@@ -176,8 +176,24 @@ namespace Types
             return getSizeof(type, nullptr, 0);
         }
 
+        struct Visitor
+        {
+            virtual ~Visitor() { }
+            virtual bool visitType(const Member & member, const Type & type) = 0;
+            virtual bool visitStructUnion(const Member & member, const StructUnion & type) = 0;
+            virtual bool visitArray(const Member & member) = 0;
+            virtual bool visitBack(const Member & member) = 0;
+        };
+
+        bool Visit(const std::string & name, const std::string & type, Visitor & visitor)
+        {
+            Member m;
+            m.name = name;
+            m.type = type;
+            return visitMember(m, visitor);
+        }
+
     private:
-        std::unordered_map<std::string, Primitive> primitives;
         std::unordered_map<Primitive, int> primitivesizes;
         std::unordered_map<std::string, Type> types;
         std::unordered_map<std::string, StructUnion> structs;
@@ -193,14 +209,26 @@ namespace Types
                     if (ch == ',')
                     {
                         if (a.length())
-                            primitives.insert({ a, p });
+                        {
+                            Type t;
+                            t.bitsize = bitsize;
+                            t.name = a;
+                            t.primitive = p;
+                            types.insert({ a, t });
+                        }
                         a.clear();
                     }
                     else
                         a.push_back(ch);
                 }
                 if (a.length())
-                    primitives.insert({ a, p });
+                {
+                    Type t;
+                    t.bitsize = bitsize;
+                    t.name = a;
+                    t.primitive = p;
+                    types.insert({ a, t });
+                }
                 primitivesizes[p] = bitsize;
             };
             p("int8_t,int8,char,byte,bool,signed char", Int8, sizeof(char) * 8);
@@ -226,7 +254,7 @@ namespace Types
 
         bool isDefined(const std::string & id) const
         {
-            return mapContains(primitives, id) || mapContains(types, id) || mapContains(structs, id);
+            return mapContains(types, id) || mapContains(structs, id);
         }
 
         int getSizeof(const std::string & type, int* alignment, int depth)
@@ -235,9 +263,6 @@ namespace Types
                 return 0;
             if (alignment)
                 *alignment = 0;
-            auto foundP = primitives.find(type);
-            if (foundP != primitives.end())
-                return primitivesizes[foundP->second] / 8;
             auto foundT = types.find(type);
             if (foundT != types.end())
             {
@@ -279,6 +304,37 @@ namespace Types
                 size += s.alignment - mod;
             }
             return size;
+        }
+
+        bool visitMember(const Member & root, Visitor & visitor)
+        {
+            auto foundT = types.find(root.type);
+            if (foundT != types.end())
+                return visitor.visitType(root, foundT->second);
+            auto foundS = structs.find(root.type);
+            if (foundS != structs.end())
+            {
+                const auto & s = foundS->second;
+                if (!visitor.visitStructUnion(root, s))
+                    return false;
+                for (const auto & child : s.members)
+                {
+                    if (child.arrsize)
+                    {
+                        if (!visitor.visitArray(child))
+                            return false;
+                        for (auto i = 0; i < child.arrsize; i++)
+                            if (!visitMember(child, visitor))
+                                return false;
+                        if (!visitor.visitBack(child))
+                            return false;
+                    }
+                    else if (!visitMember(child, visitor))
+                        return false;
+                }
+                return visitor.visitBack(root);
+            }
+            return true;
         }
     };
 };
