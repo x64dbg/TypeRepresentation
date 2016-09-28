@@ -75,6 +75,7 @@ int main()
         {
             indent();
             printf("%s %s;\n", type.name.c_str(), member.name.c_str());
+            offset += type.bitsize / 8;
             return true;
         }
 
@@ -104,9 +105,11 @@ int main()
 
     private:
         int depth = 0;
+        int offset = 0;
 
         void indent() const
         {
+            printf("%02d: ", offset);
             for (auto i = 0; i < depth * 4; i++)
                 printf(" ");
         }
