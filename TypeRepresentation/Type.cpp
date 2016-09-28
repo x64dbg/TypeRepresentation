@@ -164,6 +164,12 @@ int main()
 
     printf("t.Visit(t, TEST) = %d\n", t.Visit("t", "TEST", visitor = PrintVisitor(&test)));
 
+    t.AddType("const char*", Pointer, 0, "char");
+
+    t.AddFunction("strcasecmp", "int", Cdecl);
+    t.AppendArg("s1", "const char*");
+    t.AppendArg("s2", "const char*");
+
     getchar();
     return 0;
 }

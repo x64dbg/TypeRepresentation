@@ -182,7 +182,7 @@ namespace Types
             return true;
         }
 
-        bool AddFunctionArg(const std::string & function, const std::string & name, const std::string & type)
+        bool AddArg(const std::string & function, const std::string & name, const std::string & type)
         {
             auto found = functions.find(function);
             if (found == functions.end() || !function.length() || !name.length())
@@ -195,9 +195,9 @@ namespace Types
             return true;
         }
 
-        bool AppendFunctionArg(const std::string & name, const std::string & type)
+        bool AppendArg(const std::string & name, const std::string & type)
         {
-            return AddFunctionArg(lastfunction, name, type);
+            return AddArg(lastfunction, name, type);
         }
 
         int Sizeof(const std::string & type)
