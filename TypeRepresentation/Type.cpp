@@ -70,17 +70,16 @@ private:
         return mParents[mParents.size() - 1];
     }
 
-    std::vector<Parent> mParents;
-
-    int mOffset = 0;
-    void* mData = nullptr;
-
     void indent() const
     {
         printf("%02d: ", mOffset);
         for (auto i = 0; i < int(mParents.size()) * 2; i++)
             printf(" ");
     }
+
+    std::vector<Parent> mParents;
+    int mOffset = 0;
+    void* mData = nullptr;
 };
 
 int main()

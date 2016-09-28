@@ -76,31 +76,14 @@ namespace Types
             else
                 t.bitsize = bitsize;
             t.pointto = pointto;
-            return AddType(t);
-        }
-
-        bool AddType(const Type & t)
-        {
-            if (isDefined(t.name))
-                return false;
-            types.insert({ t.name, t });
-            return true;
+            return addType(t);
         }
 
         bool AddStruct(const std::string & name)
         {
             StructUnion s;
             s.name = name;
-            return AddStruct(s);
-        }
-
-        bool AddStruct(const StructUnion & s)
-        {
-            laststruct = s.name;
-            if (isDefined(s.name))
-                return false;
-            structs.insert({ s.name, s });
-            return true;
+            return addStructUnion(s);
         }
 
         bool AddUnion(const std::string & name)
@@ -108,16 +91,7 @@ namespace Types
             StructUnion u;
             u.isunion = true;
             u.name = name;
-            return AddUnion(u);
-        }
-
-        bool AddUnion(const StructUnion & u)
-        {
-            laststruct = u.name;
-            if (isDefined(u.name))
-                return false;
-            structs.insert({ u.name, u });
-            return true;
+            return addStructUnion(u);
         }
 
         bool AppendMember(const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
@@ -173,15 +147,6 @@ namespace Types
             {
                 s.size += typeSize;
             }
-            return true;
-        }
-
-        bool AddMember(const std::string & parent, const Member & member)
-        {
-            auto found = structs.find(parent);
-            if (found == structs.end())
-                return false;
-            found->second.members.push_back(member);
             return true;
         }
 
@@ -281,6 +246,23 @@ namespace Types
         bool isDefined(const std::string & id) const
         {
             return mapContains(types, id) || mapContains(structs, id);
+        }
+
+        bool addStructUnion(const StructUnion & s)
+        {
+            laststruct = s.name;
+            if (isDefined(s.name))
+                return false;
+            structs.insert({ s.name, s });
+            return true;
+        }
+
+        bool addType(const Type & t)
+        {
+            if (isDefined(t.name))
+                return false;
+            types.insert({ t.name, t });
+            return true;
         }
 
         bool visitMember(const Member & root, Visitor & visitor)
