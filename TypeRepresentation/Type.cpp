@@ -11,7 +11,7 @@ struct PrintVisitor : TypeManager::Visitor
     {
         unsigned long long value = 0;
         if (mData)
-            memcpy(&value, (char*)mData + mOffset, type.bitsize / 8);
+            memcpy(&value, (char*)mData + mOffset, size_t(type.bitsize / 8));
         else
             value = 0xCC;
         indent();
@@ -28,7 +28,7 @@ struct PrintVisitor : TypeManager::Visitor
     {
         indent();
         printf("%s %s {\n", type.isunion ? "union" : "struct", type.name.c_str());
-        mParentData.push_back(Parent(type.isunion ? Parent::Union : Parent::Struct));
+        mParents.push_back(Parent(type.isunion ? Parent::Union : Parent::Struct));
         return true;
     }
 
@@ -36,13 +36,13 @@ struct PrintVisitor : TypeManager::Visitor
     {
         indent();
         printf("%s[%d] {\n", member.type.c_str(), member.arrsize);
-        mParentData.push_back(Parent(Parent::Array));
+        mParents.push_back(Parent(Parent::Array));
         return true;
     }
 
     bool visitBack(const Member & member) override
     {
-        mParentData.pop_back();
+        mParents.pop_back();
         indent();
         printf("} %s;\n", member.name.c_str());
         return true;
@@ -67,10 +67,10 @@ private:
 
     Parent & parent()
     {
-        return mParentData[mParentData.size() - 1];
+        return mParents[mParents.size() - 1];
     }
 
-    std::vector<Parent> mParentData;
+    std::vector<Parent> mParents;
 
     int mOffset = 0;
     void* mData = nullptr;
@@ -78,7 +78,7 @@ private:
     void indent() const
     {
         printf("%02d: ", mOffset);
-        for (auto i = 0; i < int(mParentData.size()) * 2; i++)
+        for (auto i = 0; i < int(mParents.size()) * 2; i++)
             printf(" ");
     }
 };
