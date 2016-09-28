@@ -35,14 +35,13 @@ namespace Types
     {
         std::string name; //Member identifier
         std::string type; //Type.name
-        int offset = 0; //Member offset in Struct (ignored for unions)
         int arrsize = 0; //Number of elements if Member is an array
     };
 
     struct StructUnion
     {
         bool isunion = false; //Is this a union?
-        int alignment = sizeof(void*); //StructUnion alignment
+        int size = 0;
         std::string name; //StructUnion identifier
         std::vector<Member> members; //StructUnion members
     };
@@ -88,12 +87,10 @@ namespace Types
             return true;
         }
 
-        bool AddStruct(const std::string & name, int alignment = 0)
+        bool AddStruct(const std::string & name)
         {
             StructUnion s;
             s.name = name;
-            if (alignment > 0)
-                s.alignment = alignment;
             return AddStruct(s);
         }
 
@@ -106,13 +103,11 @@ namespace Types
             return true;
         }
 
-        bool AddUnion(const std::string & name, int alignment = 0)
+        bool AddUnion(const std::string & name)
         {
             StructUnion u;
             u.isunion = true;
             u.name = name;
-            if (alignment > 0)
-                u.alignment = alignment;
             return AddUnion(u);
         }
 
@@ -125,12 +120,12 @@ namespace Types
             return true;
         }
 
-        bool AppendMember(const std::string & name, const std::string & type, int offset = -1, int arrsize = 0)
+        bool AppendMember(const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
         {
-            return AddMember(laststruct, name, type, offset, arrsize);
+            return AddMember(laststruct, name, type, arrsize, offset);
         }
 
-        bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int offset = -1, int arrsize = 0)
+        bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
         {
             auto found = structs.find(parent);
             if (arrsize < 0 || found == structs.end() || !isDefined(type))
@@ -141,24 +136,43 @@ namespace Types
                 if (member.name == name)
                     return false;
 
+            auto typeSize = Sizeof(type);
+            if (arrsize)
+                typeSize *= arrsize;
+
             Member m;
             m.name = name;
             m.arrsize = arrsize;
             m.type = type;
-            if (offset < 0)
+
+            if (offset >= 0) //user-defined offset
             {
-                int alignment;
-                m.offset = getSizeof(parent, &alignment, 0);
-                if (s.members.size() && !m.offset)
+                if (offset < s.size)
                     return false;
-                auto typesize = Sizeof(type);
-                if (alignment && typesize <= alignment)
-                    m.offset -= alignment;
+                if (offset > s.size)
+                {
+                    Member pad;
+                    pad.type = "char";
+                    pad.arrsize = offset - s.size;
+                    char padname[32] = "";
+                    sprintf_s(padname, "padding%d", pad.arrsize);
+                    pad.name = padname;
+                    s.members.push_back(m);
+                    s.size += pad.arrsize;
+                }
             }
-            else
-                m.offset = offset;
 
             s.members.push_back(m);
+
+            if (s.isunion)
+            {
+                if (typeSize > s.size)
+                    s.size = typeSize;
+            }
+            else
+            {
+                s.size += typeSize;
+            }
             return true;
         }
 
@@ -173,7 +187,19 @@ namespace Types
 
         int Sizeof(const std::string & type)
         {
-            return getSizeof(type, nullptr, 0);
+            auto foundT = types.find(type);
+            if (foundT != types.end())
+            {
+                auto bitsize = foundT->second.bitsize;
+                auto mod = bitsize % 8;
+                if (mod)
+                    bitsize += 8 - mod;
+                return bitsize / 8;
+            }
+            auto foundS = structs.find(type);
+            if (foundS == structs.end())
+                return 0;
+            return foundS->second.size;
         }
 
         struct Visitor
@@ -255,55 +281,6 @@ namespace Types
         bool isDefined(const std::string & id) const
         {
             return mapContains(types, id) || mapContains(structs, id);
-        }
-
-        int getSizeof(const std::string & type, int* alignment, int depth)
-        {
-            if (depth >= 100)
-                return 0;
-            if (alignment)
-                *alignment = 0;
-            auto foundT = types.find(type);
-            if (foundT != types.end())
-            {
-                auto bitsize = foundT->second.bitsize;
-                auto mod = bitsize % 8;
-                if (mod)
-                    bitsize += 8 - mod;
-                return bitsize / 8;
-            }
-            auto foundS = structs.find(type);
-            if (foundS == structs.end() || !foundS->second.members.size())
-                return 0;
-            const auto & s = foundS->second;
-            auto size = 0;
-            if (foundS->second.isunion)
-            {
-                for (const auto & member : s.members)
-                {
-                    auto membersize = getSizeof(member.type, nullptr, depth + 1) * (member.arrsize ? member.arrsize : 1);
-                    if (!membersize)
-                        return 0;
-                    if (membersize > size)
-                        size = membersize;
-                }
-            }
-            else
-            {
-                const auto & last = s.members[s.members.size() - 1];
-                auto lastsize = getSizeof(last.type, nullptr, depth + 1) * (last.arrsize ? last.arrsize : 1);
-                if (!lastsize)
-                    return 0;
-                size = last.offset + lastsize;
-            }
-            auto mod = size % s.alignment;
-            if (mod)
-            {
-                if (alignment)
-                    *alignment = s.alignment - mod;
-                size += s.alignment - mod;
-            }
-            return size;
         }
 
         bool visitMember(const Member & root, Visitor & visitor)
