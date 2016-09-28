@@ -47,15 +47,18 @@ int main()
 #pragma pack(1)
     struct TEST
     {
-        int a;
-        char b;
+        int a = 0xA;
+        char b = 0xB;
         struct BLUB
         {
-            short c;
+            short c = 0xC;
             int d[2];
-        } x;
-        int y;
-    };
+        } e;
+        int f = 0xF;
+    } test;
+    test.e.d[0] = 0xD0;
+    test.e.d[1] = 0xD1;
+
     printf("sizeof(TEST) = %d\n", int(sizeof(TEST)));
 
     t.AddStruct("BLUB", 1);
@@ -65,17 +68,23 @@ int main()
     t.AddStruct("TEST", 1);
     t.AppendMember("a", "int");
     t.AppendMember("b", "char");
-    t.AppendMember("x", "BLUB");
-    t.AppendMember("y", "int");
+    t.AppendMember("e", "BLUB");
+    t.AppendMember("f", "int");
     printf("t.Sizeof(TEST) = %d\n", t.Sizeof("TEST"));
 
     struct PrintVisitor : TypeManager::Visitor
     {
+        explicit PrintVisitor(void* data)
+            : mData(data) { }
+
         bool visitType(const Member & member, const Type & type) override
         {
+            unsigned int value = 0;
+            if (mData)
+                memcpy(&value, (char*)mData + mOffset, type.bitsize / 8);
             indent();
-            printf("%s %s;\n", type.name.c_str(), member.name.c_str());
-            offset += type.bitsize / 8;
+            printf("%s %s = 0x%X;\n", type.name.c_str(), member.name.c_str(), value);
+            mOffset += type.bitsize / 8;
             return true;
         }
 
@@ -83,7 +92,7 @@ int main()
         {
             indent();
             printf("%s %s {\n", type.isunion ? "union" : "struct", type.name.c_str());
-            depth++;
+            mDepth++;
             return true;
         }
 
@@ -91,29 +100,30 @@ int main()
         {
             indent();
             printf("%s[%d] {\n", member.type.c_str(), member.arrsize);
-            depth++;
+            mDepth++;
             return true;
         }
 
         bool visitBack(const Member & member) override
         {
-            depth--;
+            mDepth--;
             indent();
             printf("} %s;\n", member.name.c_str());
             return true;
         }
 
     private:
-        int depth = 0;
-        int offset = 0;
+        int mDepth = 0;
+        int mOffset = 0;
+        void* mData = nullptr;
 
         void indent() const
         {
-            printf("%02d: ", offset);
-            for (auto i = 0; i < depth * 4; i++)
+            printf("%02d: ", mOffset);
+            for (auto i = 0; i < mDepth * 2; i++)
                 printf(" ");
         }
-    } visitor;
+    } visitor(&test);
 
     printf("t.Visit(t, TEST) = %s\n", t.Visit("t", "TEST", visitor) ? "true" : "false");
 
