@@ -46,6 +46,23 @@ namespace Types
         std::vector<Member> members; //StructUnion members
     };
 
+    enum CallingConvention
+    {
+        Cdecl,
+        Stdcall,
+        Thiscall,
+        Delphi
+    };
+
+    struct Function
+    {
+        std::string name; //Function identifier
+        std::string rettype; //Function return type
+        CallingConvention callconv; //Function calling convention
+        bool noreturn; //Function does not return (ExitProcess, _exit)
+        std::vector<Member> args; //Function arguments
+    };
+
     struct TypeManager
     {
         explicit TypeManager()
@@ -63,7 +80,7 @@ namespace Types
 
         bool AddType(const std::string & name, Primitive primitive, int bitsize = 0, const std::string & pointto = "")
         {
-            if (isDefined(name))
+            if (!name.length() || isDefined(name))
                 return false;
             Type t;
             t.name = name;
@@ -102,7 +119,7 @@ namespace Types
         bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
         {
             auto found = structs.find(parent);
-            if (arrsize < 0 || found == structs.end() || !isDefined(type))
+            if (arrsize < 0 || found == structs.end() || !isDefined(type) || !name.length() || !type.length())
                 return false;
             auto & s = found->second;
 
@@ -150,6 +167,39 @@ namespace Types
             return true;
         }
 
+        bool AddFunction(const std::string & name, const std::string & rettype, CallingConvention callconv = Cdecl, bool noreturn = false)
+        {
+            auto found = functions.find(name);
+            if (found != functions.end() || !name.length())
+                return false;
+            lastfunction = name;
+            Function f;
+            f.name = name;
+            f.rettype = rettype;
+            f.callconv = callconv;
+            f.noreturn = noreturn;
+            functions.insert({ f.name, f });
+            return true;
+        }
+
+        bool AddFunctionArg(const std::string & function, const std::string & name, const std::string & type)
+        {
+            auto found = functions.find(function);
+            if (found == functions.end() || !function.length() || !name.length())
+                return false;
+            lastfunction = function;
+            Member arg;
+            arg.name = name;
+            arg.type = type;
+            found->second.args.push_back(arg);
+            return true;
+        }
+
+        bool AppendFunctionArg(const std::string & name, const std::string & type)
+        {
+            return AddFunctionArg(lastfunction, name, type);
+        }
+
         int Sizeof(const std::string & type)
         {
             auto foundT = types.find(type);
@@ -188,7 +238,9 @@ namespace Types
         std::unordered_map<Primitive, int> primitivesizes;
         std::unordered_map<std::string, Type> types;
         std::unordered_map<std::string, StructUnion> structs;
+        std::unordered_map<std::string, Function> functions;
         std::string laststruct;
+        std::string lastfunction;
 
         void setupPrimitives()
         {
@@ -251,7 +303,7 @@ namespace Types
         bool addStructUnion(const StructUnion & s)
         {
             laststruct = s.name;
-            if (isDefined(s.name))
+            if (!s.name.length() || isDefined(s.name))
                 return false;
             structs.insert({ s.name, s });
             return true;
@@ -259,7 +311,7 @@ namespace Types
 
         bool addType(const Type & t)
         {
-            if (isDefined(t.name))
+            if (!t.name.length() || isDefined(t.name))
                 return false;
             types.insert({ t.name, t });
             return true;
