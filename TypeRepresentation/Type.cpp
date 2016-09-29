@@ -86,6 +86,7 @@ int main()
 {
     TypeManager t;
     PrintVisitor visitor;
+    std::string owner = "me";
 
     struct ST
     {
@@ -94,7 +95,7 @@ int main()
     };
     printf("sizeof(ST) = %d\n", int(sizeof(ST)));
 
-    t.AddStruct("ST");
+    t.AddStruct(owner, "ST");
     t.AppendMember("a", "char", 3);
     t.AppendMember("y", "int", 0, 4);
     printf("t.Sizeof(ST) = %d\n", t.Sizeof("ST"));
@@ -103,10 +104,10 @@ int main()
 
     puts("- - - -");
 
-    t.AddType("DWORD", "unsigned int");
+    t.AddType(owner, "DWORD", "unsigned int");
     printf("t.Sizeof(DWORD) = %d\n", t.Sizeof("DWORD"));
 
-    t.AddStruct("_FILETIME");
+    t.AddStruct(owner, "_FILETIME");
     t.AppendMember("dwLoDateTime", "DWORD");
     t.AppendMember("dwHighDateTime", "DWORD");
     printf("t.Sizeof(_FILETIME) = %d\n", t.Sizeof("_FILETIME"));
@@ -123,7 +124,7 @@ int main()
     };
     printf("sizeof(UT) = %d\n", int(sizeof(UT)));
 
-    t.AddUnion("UT");
+    t.AddUnion(owner, "UT");
     t.AppendMember("a", "char");
     t.AppendMember("b", "short");
     t.AppendMember("c", "int");
@@ -151,11 +152,11 @@ int main()
 
     printf("sizeof(TEST) = %d\n", int(sizeof(TEST)));
 
-    t.AddStruct("BLUB");
+    t.AddStruct(owner, "BLUB");
     t.AppendMember("c", "short");
     t.AppendMember("d", "int", 2);
 
-    t.AddStruct("TEST");
+    t.AddStruct(owner, "TEST");
     t.AppendMember("a", "int");
     t.AppendMember("b", "char");
     t.AppendMember("e", "BLUB");
@@ -164,11 +165,13 @@ int main()
 
     printf("t.Visit(t, TEST) = %d\n", t.Visit("t", "TEST", visitor = PrintVisitor(&test)));
 
-    t.AddType("const char*", Pointer, 0, "char");
+    t.AddType(owner, "const char*", Pointer, 0, "char");
 
-    t.AddFunction("strcasecmp", "int", Cdecl);
+    t.AddFunction(owner, "strcasecmp", "int", Cdecl);
     t.AppendArg("s1", "const char*");
     t.AppendArg("s2", "const char*");
+
+    t.Clear();
 
     getchar();
     return 0;

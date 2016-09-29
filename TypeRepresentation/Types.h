@@ -25,10 +25,11 @@ namespace Types
 
     struct Type
     {
+        std::string owner; //Type owner
         std::string name; //Type identifier.
+        std::string pointto; //Type identifier of *Type
         Primitive primitive; //Primitive type.
         int bitsize = 0; //Size in bits.
-        std::string pointto; //Type identifier of *Type
     };
 
     struct Member
@@ -40,10 +41,11 @@ namespace Types
 
     struct StructUnion
     {
-        bool isunion = false; //Is this a union?
-        int size = 0;
+        std::string owner; //StructUnion owner
         std::string name; //StructUnion identifier
         std::vector<Member> members; //StructUnion members
+        bool isunion = false; //Is this a union?
+        int size = 0;
     };
 
     enum CallingConvention
@@ -56,6 +58,7 @@ namespace Types
 
     struct Function
     {
+        std::string owner; //Function owner
         std::string name; //Function identifier
         std::string rettype; //Function return type
         CallingConvention callconv; //Function calling convention
@@ -70,19 +73,20 @@ namespace Types
             setupPrimitives();
         }
 
-        bool AddType(const std::string & name, const std::string & type)
+        bool AddType(const std::string & owner, const std::string & name, const std::string & type)
         {
             auto found = types.find(type);
             if (found == types.end())
                 return false;
-            return AddType(name, found->second.primitive);
+            return AddType(owner, name, found->second.primitive);
         }
 
-        bool AddType(const std::string & name, Primitive primitive, int bitsize = 0, const std::string & pointto = "")
+        bool AddType(const std::string & owner, const std::string & name, Primitive primitive, int bitsize = 0, const std::string & pointto = "")
         {
-            if (!name.length() || isDefined(name))
+            if (!owner.length() || !name.length() || isDefined(name))
                 return false;
             Type t;
+            t.owner = owner;
             t.name = name;
             t.primitive = primitive;
             auto primsize = primitivesizes[primitive];
@@ -96,18 +100,20 @@ namespace Types
             return addType(t);
         }
 
-        bool AddStruct(const std::string & name)
+        bool AddStruct(const std::string & owner, const std::string & name)
         {
             StructUnion s;
             s.name = name;
+            s.owner = owner;
             return addStructUnion(s);
         }
 
-        bool AddUnion(const std::string & name)
+        bool AddUnion(const std::string & owner, const std::string & name)
         {
             StructUnion u;
-            u.isunion = true;
+            u.owner = owner;
             u.name = name;
+            u.isunion = true;
             return addStructUnion(u);
         }
 
@@ -119,7 +125,7 @@ namespace Types
         bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
         {
             auto found = structs.find(parent);
-            if (arrsize < 0 || found == structs.end() || !isDefined(type) || !name.length() || !type.length())
+            if (arrsize < 0 || found == structs.end() || !isDefined(type) || !name.length() || !type.length() || type == parent)
                 return false;
             auto & s = found->second;
 
@@ -167,13 +173,14 @@ namespace Types
             return true;
         }
 
-        bool AddFunction(const std::string & name, const std::string & rettype, CallingConvention callconv = Cdecl, bool noreturn = false)
+        bool AddFunction(const std::string & owner, const std::string & name, const std::string & rettype, CallingConvention callconv = Cdecl, bool noreturn = false)
         {
             auto found = functions.find(name);
-            if (found != functions.end() || !name.length())
+            if (found != functions.end() || !name.length() || !owner.length())
                 return false;
             lastfunction = name;
             Function f;
+            f.owner = owner;
             f.name = name;
             f.rettype = rettype;
             f.callconv = callconv;
@@ -234,6 +241,15 @@ namespace Types
             return visitMember(m, visitor);
         }
 
+        void Clear(const std::string & owner = "")
+        {
+            laststruct.clear();
+            lastfunction.clear();
+            filterOwnerMap(types, owner);
+            filterOwnerMap(structs, owner);
+            filterOwnerMap(functions, owner);
+        }
+
     private:
         std::unordered_map<Primitive, int> primitivesizes;
         std::unordered_map<std::string, Type> types;
@@ -241,6 +257,19 @@ namespace Types
         std::unordered_map<std::string, Function> functions;
         std::string laststruct;
         std::string lastfunction;
+
+        template<typename K, typename V>
+        void filterOwnerMap(std::unordered_map<K ,V> & map, const std::string & owner)
+        {
+            for (auto i = map.begin(); i != map.end();)
+            {
+                auto j = i++;
+                if (j->second.owner.empty())
+                    continue;
+                if (owner.empty() || j->second.owner == owner)
+                    map.erase(j);
+            }
+        }
 
         void setupPrimitives()
         {
@@ -303,7 +332,7 @@ namespace Types
         bool addStructUnion(const StructUnion & s)
         {
             laststruct = s.name;
-            if (!s.name.length() || isDefined(s.name))
+            if (!s.owner.length() || !s.name.length() || isDefined(s.name))
                 return false;
             structs.insert({ s.name, s });
             return true;
@@ -311,7 +340,7 @@ namespace Types
 
         bool addType(const Type & t)
         {
-            if (!t.name.length() || isDefined(t.name))
+            if (!t.owner.length() || !t.name.length() || isDefined(t.name))
                 return false;
             types.insert({ t.name, t });
             return true;
@@ -345,7 +374,7 @@ namespace Types
                 }
                 return visitor.visitBack(root);
             }
-            return true;
+            return false;
         }
     };
 };
