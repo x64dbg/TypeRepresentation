@@ -44,7 +44,7 @@ struct PrintVisitor : TypeManager::Visitor
     bool visitPtr(const Member & member, const Type & type) override
     {
         auto offset = mOffset;
-        auto res = visitType(member, type);
+        auto res = visitType(member, type); //print the pointer value
         if (mPtrDepth >= mMaxPtrDepth)
             return false;
         void* value = nullptr;
@@ -216,7 +216,6 @@ int main()
     t.AddStruct(owner, "POINTEE");
     t.AppendMember("n", "int");
     t.AppendMember("t", "TEST");
-    t.AddType(owner, "POINTEE*", Pointer, 0, "POINTEE");
 
     t.AddStruct(owner, "POINTER");
     t.AppendMember("x", "int");
@@ -236,14 +235,13 @@ int main()
     le.next = &le;
 
     t.AddStruct(owner, "LIST_ENTRY");
-    t.AddType(owner, "LIST_ENTRY*", Pointer, 0, "LIST_ENTRY");
     t.AppendMember("x", "int");
     t.AppendMember("next", "LIST_ENTRY*");
     t.AppendMember("y", "int");
 
     printf("t.Visit(le, LIST_ENTRY) = %d\n", t.Visit("le", "LIST_ENTRY", visitor = PrintVisitor(&le, 2)));
 
-    t.AddType(owner, "const char*", Pointer, 0, "char");
+    t.AddType(owner, "const char", "char");
 
     t.AddFunction(owner, "strcasecmp", "int", Cdecl);
     t.AppendArg("s1", "const char*");

@@ -125,6 +125,8 @@ namespace Types
         bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
         {
             auto found = structs.find(parent);
+            if (!isDefined(type) && !validPtr(type))
+                return false;
             if (arrsize < 0 || found == structs.end() || !isDefined(type) || name.empty() || type.empty() || type == parent)
                 return false;
             auto & s = found->second;
@@ -192,7 +194,9 @@ namespace Types
         bool AddArg(const std::string & function, const std::string & name, const std::string & type)
         {
             auto found = functions.find(function);
-            if (found == functions.end() || function.empty() || name.empty())
+            if (!isDefined(type) && !validPtr(type))
+                return false;
+            if (found == functions.end() || function.empty() || name.empty() || !isDefined(type))
                 return false;
             lastfunction = function;
             Member arg;
@@ -328,6 +332,18 @@ namespace Types
         bool isDefined(const std::string & id) const
         {
             return mapContains(types, id) || mapContains(structs, id);
+        }
+
+        bool validPtr(const std::string & id)
+        {
+            if (id[id.length() - 1] == '*')
+            {
+                auto type = id.substr(0, id.length() - 1);
+                if (!isDefined(type))
+                    return false;
+                return AddType("ptr", id, Pointer, 0, type);
+            }
+            return false;
         }
 
         bool addStructUnion(const StructUnion & s)
