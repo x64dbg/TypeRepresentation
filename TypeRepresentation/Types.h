@@ -29,7 +29,7 @@ namespace Types
         std::string name; //Type identifier.
         std::string pointto; //Type identifier of *Type
         Primitive primitive; //Primitive type.
-        int bitsize = 0; //Size in bits.
+        int size = 0; //Size in bytes.
     };
 
     struct Member
@@ -81,7 +81,7 @@ namespace Types
             return AddType(owner, name, found->second.primitive);
         }
 
-        bool AddType(const std::string & owner, const std::string & name, Primitive primitive, int bitsize = 0, const std::string & pointto = "")
+        bool AddType(const std::string & owner, const std::string & name, Primitive primitive, const std::string & pointto = "")
         {
             if (owner.empty() || name.empty() || isDefined(name))
                 return false;
@@ -89,13 +89,7 @@ namespace Types
             t.owner = owner;
             t.name = name;
             t.primitive = primitive;
-            auto primsize = primitivesizes[primitive];
-            if (bitsize <= 0)
-                t.bitsize = primsize;
-            else if (bitsize > primsize)
-                return false;
-            else
-                t.bitsize = bitsize;
+            t.size = primitivesizes[primitive];
             t.pointto = pointto;
             return addType(t);
         }
@@ -215,17 +209,11 @@ namespace Types
         {
             auto foundT = types.find(type);
             if (foundT != types.end())
-            {
-                auto bitsize = foundT->second.bitsize;
-                auto mod = bitsize % 8;
-                if (mod)
-                    bitsize += 8 - mod;
-                return bitsize / 8;
-            }
+                return foundT->second.size;
             auto foundS = structs.find(type);
-            if (foundS == structs.end())
-                return 0;
-            return foundS->second.size;
+            if (foundS != structs.end())
+                return foundS->second.size;
+            return 0;
         }
 
         struct Visitor
@@ -278,7 +266,7 @@ namespace Types
 
         void setupPrimitives()
         {
-            auto p = [this](const std::string & n, Primitive p, int bitsize)
+            auto p = [this](const std::string & n, Primitive p, int size)
             {
                 std::string a;
                 for (auto ch : n)
@@ -288,7 +276,7 @@ namespace Types
                         if (!a.empty())
                         {
                             Type t;
-                            t.bitsize = bitsize;
+                            t.size = size;
                             t.name = a;
                             t.primitive = p;
                             types.insert({ a, t });
@@ -301,26 +289,26 @@ namespace Types
                 if (!a.empty())
                 {
                     Type t;
-                    t.bitsize = bitsize;
+                    t.size = size;
                     t.name = a;
                     t.primitive = p;
                     types.insert({ a, t });
                 }
-                primitivesizes[p] = bitsize;
+                primitivesizes[p] = size;
             };
-            p("int8_t,int8,char,byte,bool,signed char", Int8, sizeof(char) * 8);
-            p("uint8_t,uint8,uchar,unsigned char,ubyte", Uint8, sizeof(unsigned char) * 8);
-            p("int16_t,int16,wchar_t,char16_t,short", Int16, sizeof(short) * 8);
-            p("uint16_t,uint16,ushort,unsigned short", Int16, sizeof(unsigned short) * 8);
-            p("int32_t,int32,int,long", Int32, sizeof(int) * 8);
-            p("uint32_t,uint32,unsigned int,unsigned long", Uint32, sizeof(unsigned int) * 8);
-            p("int64_t,int64,long long", Int64, sizeof(long long) * 8);
-            p("uint64_t,uint64,unsigned long long", Uint64, sizeof(unsigned long long) * 8);
-            p("dsint", Dsint, sizeof(void*) * 8);
-            p("duint,size_t", Duint, sizeof(void*) * 8);
-            p("ptr,void*", Pointer, sizeof(void*) * 8);
-            p("float", Float, sizeof(float) * 8);
-            p("double", Double, sizeof(double) * 8);
+            p("int8_t,int8,char,byte,bool,signed char", Int8, sizeof(char));
+            p("uint8_t,uint8,uchar,unsigned char,ubyte", Uint8, sizeof(unsigned char));
+            p("int16_t,int16,wchar_t,char16_t,short", Int16, sizeof(short));
+            p("uint16_t,uint16,ushort,unsigned short", Int16, sizeof(unsigned short));
+            p("int32_t,int32,int,long", Int32, sizeof(int));
+            p("uint32_t,uint32,unsigned int,unsigned long", Uint32, sizeof(unsigned int));
+            p("int64_t,int64,long long", Int64, sizeof(long long));
+            p("uint64_t,uint64,unsigned long long", Uint64, sizeof(unsigned long long));
+            p("dsint", Dsint, sizeof(void*));
+            p("duint,size_t", Duint, sizeof(void*));
+            p("ptr,void*", Pointer, sizeof(void*));
+            p("float", Float, sizeof(float));
+            p("double", Double, sizeof(double));
         }
 
         template<typename K, typename V>
@@ -341,7 +329,7 @@ namespace Types
                 auto type = id.substr(0, id.length() - 1);
                 if (!isDefined(type))
                     return false;
-                return AddType("ptr", id, Pointer, 0, type);
+                return AddType("ptr", id, Pointer, type);
             }
             return false;
         }

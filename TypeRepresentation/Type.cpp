@@ -11,7 +11,7 @@ struct PrintVisitor : TypeManager::Visitor
     {
         unsigned long long value = 0;
         if (mData)
-            memcpy(&value, (char*)mData + mOffset, size_t(type.bitsize / 8));
+            memcpy(&value, (char*)mData + mOffset, size_t(type.size));
         else
             value = 0xCC;
         indent();
@@ -21,7 +21,7 @@ struct PrintVisitor : TypeManager::Visitor
             printf("%s %s = 0x%llX;", type.name.c_str(), member.name.c_str(), value);
         puts(type.pointto.empty() || mPtrDepth >= mMaxPtrDepth ? "" : " {");
         if (parent().type != Parent::Union)
-            mOffset += type.bitsize / 8;
+            mOffset += type.size;
         return true;
     }
 
@@ -49,7 +49,7 @@ struct PrintVisitor : TypeManager::Visitor
             return false;
         void* value = nullptr;
         if (mData)
-            memcpy(&value, (char*)mData + offset, size_t(type.bitsize / 8));
+            memcpy(&value, (char*)mData + offset, size_t(type.size));
         else
             return false;
         mParents.push_back(Parent(Parent::Pointer));
@@ -103,7 +103,7 @@ private:
     void indent() const
     {
         printf("%p:%02d: ", mData, mOffset);
-        for (auto i = 0; i < int(mParents.size()) * 4; i++)
+        for (auto i = 0; i < int(mParents.size()) * 2; i++)
             printf(" ");
     }
 
@@ -239,7 +239,7 @@ int main()
     t.AppendMember("next", "LIST_ENTRY*");
     t.AppendMember("y", "int");
 
-    printf("t.Visit(le, LIST_ENTRY) = %d\n", t.Visit("le", "LIST_ENTRY", visitor = PrintVisitor(&le, 2)));
+    printf("t.Visit(le, LIST_ENTRY) = %d\n", t.Visit("le", "LIST_ENTRY", visitor = PrintVisitor(&le, 6)));
 
     t.AddType(owner, "const char", "char");
 
