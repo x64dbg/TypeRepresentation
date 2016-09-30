@@ -83,7 +83,7 @@ namespace Types
 
         bool AddType(const std::string & owner, const std::string & name, Primitive primitive, int bitsize = 0, const std::string & pointto = "")
         {
-            if (!owner.length() || !name.length() || isDefined(name))
+            if (owner.empty() || name.empty() || isDefined(name))
                 return false;
             Type t;
             t.owner = owner;
@@ -125,7 +125,7 @@ namespace Types
         bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
         {
             auto found = structs.find(parent);
-            if (arrsize < 0 || found == structs.end() || !isDefined(type) || !name.length() || !type.length() || type == parent)
+            if (arrsize < 0 || found == structs.end() || !isDefined(type) || name.empty() || type.empty() || type == parent)
                 return false;
             auto & s = found->second;
 
@@ -176,7 +176,7 @@ namespace Types
         bool AddFunction(const std::string & owner, const std::string & name, const std::string & rettype, CallingConvention callconv = Cdecl, bool noreturn = false)
         {
             auto found = functions.find(name);
-            if (found != functions.end() || !name.length() || !owner.length())
+            if (found != functions.end() || name.empty() || owner.empty())
                 return false;
             lastfunction = name;
             Function f;
@@ -192,7 +192,7 @@ namespace Types
         bool AddArg(const std::string & function, const std::string & name, const std::string & type)
         {
             auto found = functions.find(function);
-            if (found == functions.end() || !function.length() || !name.length())
+            if (found == functions.end() || function.empty() || name.empty())
                 return false;
             lastfunction = function;
             Member arg;
@@ -230,6 +230,7 @@ namespace Types
             virtual bool visitType(const Member & member, const Type & type) = 0;
             virtual bool visitStructUnion(const Member & member, const StructUnion & type) = 0;
             virtual bool visitArray(const Member & member) = 0;
+            virtual bool visitPtr(const Member & member, const Type & type) = 0;
             virtual bool visitBack(const Member & member) = 0;
         };
 
@@ -280,7 +281,7 @@ namespace Types
                 {
                     if (ch == ',')
                     {
-                        if (a.length())
+                        if (!a.empty())
                         {
                             Type t;
                             t.bitsize = bitsize;
@@ -293,7 +294,7 @@ namespace Types
                     else
                         a.push_back(ch);
                 }
-                if (a.length())
+                if (!a.empty())
                 {
                     Type t;
                     t.bitsize = bitsize;
@@ -332,7 +333,7 @@ namespace Types
         bool addStructUnion(const StructUnion & s)
         {
             laststruct = s.name;
-            if (!s.owner.length() || !s.name.length() || isDefined(s.name))
+            if (s.owner.empty() || s.name.empty() || isDefined(s.name))
                 return false;
             structs.insert({ s.name, s });
             return true;
@@ -340,7 +341,7 @@ namespace Types
 
         bool addType(const Type & t)
         {
-            if (!t.owner.length() || !t.name.length() || isDefined(t.name))
+            if (t.owner.empty() || t.name.empty() || isDefined(t.name))
                 return false;
             types.insert({ t.name, t });
             return true;
@@ -350,7 +351,22 @@ namespace Types
         {
             auto foundT = types.find(root.type);
             if (foundT != types.end())
-                return visitor.visitType(root, foundT->second);
+            {
+                const auto & t = foundT->second;
+                if (!t.pointto.empty())
+                {
+                    if (!isDefined(t.pointto))
+                        return false;
+                    if (visitor.visitPtr(root, t)) //allow the visitor to bail out
+                    {
+                        if (!Visit("*" + root.name, t.pointto, visitor))
+                            return false;
+                        return visitor.visitBack(root);
+                    }
+                    return true;
+                }
+                return visitor.visitType(root, t);
+            }
             auto foundS = structs.find(root.type);
             if (foundS != structs.end())
             {

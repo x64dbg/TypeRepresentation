@@ -4,8 +4,8 @@ using namespace Types;
 
 struct PrintVisitor : TypeManager::Visitor
 {
-    explicit PrintVisitor(void* data = nullptr)
-        : mData(data) { }
+    explicit PrintVisitor(void* data = nullptr, int maxPtrDepth = 0)
+        : mData(data), mMaxPtrDepth(maxPtrDepth) { }
 
     bool visitType(const Member & member, const Type & type) override
     {
@@ -16,9 +16,10 @@ struct PrintVisitor : TypeManager::Visitor
             value = 0xCC;
         indent();
         if (parent().type == Parent::Array)
-            printf("%s %s[%d] = 0x%llX;\n", type.name.c_str(), member.name.c_str(), parent().index++, value);
+            printf("%s %s[%d] = 0x%llX;", type.name.c_str(), member.name.c_str(), parent().index++, value);
         else
-            printf("%s %s = 0x%llX;\n", type.name.c_str(), member.name.c_str(), value);
+            printf("%s %s = 0x%llX;", type.name.c_str(), member.name.c_str(), value);
+        puts(type.pointto.empty() || mPtrDepth >= mMaxPtrDepth ? "" : " {");
         if (parent().type != Parent::Union)
             mOffset += type.bitsize / 8;
         return true;
@@ -40,8 +41,34 @@ struct PrintVisitor : TypeManager::Visitor
         return true;
     }
 
+    bool visitPtr(const Member & member, const Type & type) override
+    {
+        auto offset = mOffset;
+        auto res = visitType(member, type);
+        if (mPtrDepth >= mMaxPtrDepth)
+            return false;
+        void* value = nullptr;
+        if (mData)
+            memcpy(&value, (char*)mData + offset, size_t(type.bitsize / 8));
+        else
+            return false;
+        mParents.push_back(Parent(Parent::Pointer));
+        parent().offset = mOffset;
+        parent().data = mData;
+        mOffset = 0;
+        mData = value;
+        mPtrDepth++;
+        return res;
+    }
+
     bool visitBack(const Member & member) override
     {
+        if (parent().type == Parent::Pointer)
+        {
+            mOffset = parent().offset;
+            mData = parent().data;
+            mPtrDepth--;
+        }
         mParents.pop_back();
         indent();
         printf("} %s;\n", member.name.c_str());
@@ -55,14 +82,17 @@ private:
         {
             Struct,
             Union,
-            Array
+            Array,
+            Pointer
         };
         
         Type type;
-        int index;
+        int index = 0;
+        void* data = nullptr;
+        int offset = 0;
 
         explicit Parent(Type type)
-            : type(type), index(0) { }
+            : type(type) { }
     };
 
     Parent & parent()
@@ -72,16 +102,19 @@ private:
 
     void indent() const
     {
-        printf("%02d: ", mOffset);
-        for (auto i = 0; i < int(mParents.size()) * 2; i++)
+        printf("%p:%02d: ", mData, mOffset);
+        for (auto i = 0; i < int(mParents.size()) * 4; i++)
             printf(" ");
     }
 
     std::vector<Parent> mParents;
     int mOffset = 0;
     void* mData = nullptr;
+    int mPtrDepth = 0;
+    int mMaxPtrDepth = 0;
 };
 
+#pragma pack(push, 1)
 int main()
 {
     TypeManager t;
@@ -114,7 +147,6 @@ int main()
 
     puts("- - - -");
 
-#pragma pack(1)
     union UT
     {
         char a;
@@ -135,7 +167,6 @@ int main()
 
     puts("- - - -");
 
-#pragma pack(1)
     struct TEST
     {
         int a = 0xA;
@@ -164,6 +195,53 @@ int main()
     printf("t.Sizeof(TEST) = %d\n", t.Sizeof("TEST"));
 
     printf("t.Visit(t, TEST) = %d\n", t.Visit("t", "TEST", visitor = PrintVisitor(&test)));
+
+    puts("- - - -");
+
+    struct POINTEE
+    {
+        int n = 0x1337;
+        TEST t;
+    } ptee;
+    ptee.t = test;
+
+    struct POINTER
+    {
+        int x = 0x30;
+        POINTEE* p = nullptr;
+        int y = 0x70;
+    } ptr;
+    ptr.p = &ptee;
+
+    t.AddStruct(owner, "POINTEE");
+    t.AppendMember("n", "int");
+    t.AppendMember("t", "TEST");
+    t.AddType(owner, "POINTEE*", Pointer, 0, "POINTEE");
+
+    t.AddStruct(owner, "POINTER");
+    t.AppendMember("x", "int");
+    t.AppendMember("p", "POINTEE*");
+    t.AppendMember("y", "int");
+
+    printf("t.Visit(ptr, POINTER) = %d\n", t.Visit("ptr", "POINTER", visitor = PrintVisitor(&ptr, 1)));
+
+    puts("- - - -");
+
+    struct LIST_ENTRY
+    {
+        int x = 0x123;
+        LIST_ENTRY* next;
+        int y = 0x312;
+    } le;
+    le.next = &le;
+
+    t.AddStruct(owner, "LIST_ENTRY");
+    t.AddType(owner, "LIST_ENTRY*", Pointer, 0, "LIST_ENTRY");
+    t.AppendMember("x", "int");
+    t.AppendMember("next", "LIST_ENTRY*");
+    t.AppendMember("y", "int");
+
+    printf("t.Visit(le, LIST_ENTRY) = %d\n", t.Visit("le", "LIST_ENTRY", visitor = PrintVisitor(&le, 2)));
 
     t.AddType(owner, "const char*", Pointer, 0, "char");
 
