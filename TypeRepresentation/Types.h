@@ -18,9 +18,11 @@ namespace Types
         Uint64,
         Dsint,
         Duint,
-        Pointer,
         Float,
-        Double
+        Double,
+        Pointer,
+        String, //char* (null-terminated)
+        WString //wchar_t* (null-terminated)
     };
 
     struct Type
@@ -306,9 +308,11 @@ namespace Types
             p("uint64_t,uint64,unsigned long long", Uint64, sizeof(unsigned long long));
             p("dsint", Dsint, sizeof(void*));
             p("duint,size_t", Duint, sizeof(void*));
-            p("ptr,void*", Pointer, sizeof(void*));
             p("float", Float, sizeof(float));
             p("double", Double, sizeof(double));
+            p("ptr,void*", Pointer, sizeof(void*));
+            p("char*,const char*", String, sizeof(char*));
+            p("wchar_t*,const wchar_t*", WString, sizeof(wchar_t*));
         }
 
         template<typename K, typename V>

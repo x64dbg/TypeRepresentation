@@ -12,13 +12,27 @@ struct PrintVisitor : TypeManager::Visitor
         unsigned long long value = 0;
         if (mData)
             memcpy(&value, (char*)mData + mOffset, size_t(type.size));
-        else
-            value = 0xCC;
+        char valueStr[256] = "";
+        switch (type.primitive)
+        {
+        case Pointer:
+            sprintf_s(valueStr, "0x%p", value);
+            break;
+        case String:
+            sprintf_s(valueStr, "\"%s\"", (char*)value);
+            break;
+        case WString:
+            sprintf_s(valueStr, "L\"%S\"", (wchar_t*)value);
+            break;
+        default:
+            sprintf_s(valueStr, "0x%llX", value);
+            break;
+        }
         indent();
         if (parent().type == Parent::Array)
-            printf("%s %s[%d] = 0x%llX;", type.name.c_str(), member.name.c_str(), parent().index++, value);
+            printf("%s %s[%d] = %s;", type.name.c_str(), member.name.c_str(), parent().index++, valueStr);
         else
-            printf("%s %s = 0x%llX;", type.name.c_str(), member.name.c_str(), value);
+            printf("%s %s = %s;", type.name.c_str(), member.name.c_str(), valueStr);
         puts(type.pointto.empty() || mPtrDepth >= mMaxPtrDepth ? "" : " {");
         if (parent().type != Parent::Union)
             mOffset += type.size;
@@ -239,9 +253,20 @@ int main()
     t.AppendMember("next", "LIST_ENTRY*");
     t.AppendMember("y", "int");
 
-    printf("t.Visit(le, LIST_ENTRY) = %d\n", t.Visit("le", "LIST_ENTRY", visitor = PrintVisitor(&le, 6)));
+    printf("t.Visit(le, LIST_ENTRY) = %d\n", t.Visit("le", "LIST_ENTRY", visitor = PrintVisitor(&le, 4)));
 
-    t.AddType(owner, "const char", "char");
+    puts("- - - -");
+
+    struct STRINGTEST
+    {
+        const char* str = "test char*";
+        const wchar_t* wstr = L"test wchar_t*";
+    } strtest;
+
+    t.AddStruct(owner, "STRINGTEST");
+    t.AppendMember("str", "const char*");
+    t.AppendMember("wstr", "const wchar_t*");
+    printf("t.Visit(strtest, STRINGTEST) = %d\n", t.Visit("strtest", "STRINGTEST", visitor = PrintVisitor(&strtest, 0)));
 
     t.AddFunction(owner, "strcasecmp", "int", Cdecl);
     t.AppendArg("s1", "const char*");
