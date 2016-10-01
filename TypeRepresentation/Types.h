@@ -118,9 +118,9 @@ namespace Types
 
         bool AddMember(const std::string & parent, const std::string & name, const std::string & type, int arrsize = 0, int offset = -1)
         {
-            auto found = structs.find(parent);
             if (!isDefined(type) && !validPtr(type))
                 return false;
+            auto found = structs.find(parent);
             if (arrsize < 0 || found == structs.end() || !isDefined(type) || name.empty() || type.empty() || type == parent)
                 return false;
             auto & s = found->second;
@@ -187,9 +187,9 @@ namespace Types
 
         bool AddArg(const std::string & function, const std::string & name, const std::string & type)
         {
-            auto found = functions.find(function);
             if (!isDefined(type) && !validPtr(type))
                 return false;
+            auto found = functions.find(function);
             if (found == functions.end() || function.empty() || name.empty() || !isDefined(type))
                 return false;
             lastfunction = function;
@@ -329,7 +329,14 @@ namespace Types
                 auto type = id.substr(0, id.length() - 1);
                 if (!isDefined(type))
                     return false;
-                return AddType("ptr", id, Pointer, type);
+                std::string owner("ptr");
+                auto foundT = types.find(type);
+                if (foundT != types.end())
+                    owner = foundT->second.owner;
+                auto foundS = structs.find(type);
+                if (foundS != structs.end())
+                    owner = foundS->second.owner;
+                return AddType(owner, id, Pointer, type);
             }
             return false;
         }
